@@ -45,7 +45,28 @@ get_ipv4() {
     fi
 }
 
-INTERFACE_ADDR=$(get_ipv4 "${INTERFACE}")
+get_gateway_ipv4() {
+    local interface="$1"
+    
+    # 方法1：使用 ip route 获取网关（推荐）
+    local gateway=$(ip -4 route show dev "$interface" | awk '/default/ {print $3}')
+    
+    # 方法2：如果 ip 命令失败，尝试使用 netstat（兼容旧系统）
+    if [ -z "$gateway" ]; then
+        gateway=$(netstat -rn | grep -E "^0.0.0.0.*$interface" | awk '{print $2}')
+    fi
+    
+    # 输出结果
+    if [ -n "$gateway" ]; then
+        echo "$gateway"
+        return 0
+    else
+        echo "错误：无法获取接口 $interface 的默认网关 IPv4 地址" >&2
+        return 1
+    fi
+}
+
+INTERFACE_GATEWAY_ADDR=$(get_gateway_ipv4 "${INTERFACE}")
 
 
 ########################################################################################################################
@@ -114,7 +135,7 @@ wait_configuration
 echo "Setup the VPN connection with the following OpenVPN configuration."
 cat ${OPENVPN_CONFIG}
 
-ip route add "${OPENVPN_SERVER_ADDR}" via "${INTERFACE_ADDR}" dev "${INTERFACE}"
+ip route add "${OPENVPN_SERVER_ADDR}" via "${INTERFACE_GATEWAY_ADDR}" dev "${INTERFACE}"
 
 # try to connect to the server using the used defined configuration
 openvpn --config ${OPENVPN_CONFIG}
