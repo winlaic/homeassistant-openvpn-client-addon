@@ -15,7 +15,8 @@
     "interface": "end0"
   },
   "schema": {
-    "ovpnfile": "str"
+    "ovpnfile": "str",
+    "interface": "str"
   },
   "map" : ["share:rw"]
 }
