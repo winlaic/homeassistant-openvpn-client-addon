@@ -4,7 +4,9 @@ set +u
 CONFIG_PATH=/data/options.json
 
 OVPNFILE="$(jq --raw-output '.ovpnfile' $CONFIG_PATH)"
+INTERFACE="$(jq --raw-output '.interface' $CONFIG_PATH)"
 OPENVPN_CONFIG=/share/${OVPNFILE}
+OPENVPN_SERVER_ADDR=$(cat "${OPENVPN_CONFIG}" | grep -oP '(?<=remote\s)\d+(\.\d+){3}')
 
 ########################################################################################################################
 # Initialize the tun interface for OpenVPN if not already available
@@ -21,6 +23,30 @@ function init_tun_interface(){
         mknod /dev/net/tun c 10 200
     fi
 }
+
+get_ipv4() {
+    local interface="$1"
+    
+    # 使用 ip 命令获取 IPv4 地址（推荐方式）
+    local ipv4=$(ip -4 addr show "$interface" | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    
+    # 如果 ip 命令失败，尝试使用 ifconfig（兼容旧系统）
+    if [ -z "$ipv4" ]; then
+        ipv4=$(ifconfig "$interface" | grep -oP '(?<=inet\s)\d+(\.\d+){3}')
+    fi
+    
+    # 输出结果
+    if [ -n "$ipv4" ]; then
+        echo "$ipv4"
+        return 0
+    else
+        echo "错误：无法获取接口 $interface 的 IPv4 地址" >&2
+        return 1
+    fi
+}
+
+INTERFACE_ADDR=$(get_ipv4 "${INTERFACE}")
+
 
 ########################################################################################################################
 # Check if all required files are available.
@@ -87,6 +113,8 @@ wait_configuration
 
 echo "Setup the VPN connection with the following OpenVPN configuration."
 cat ${OPENVPN_CONFIG}
+
+ip route add "${OPENVPN_SERVER_ADDR}" via "${INTERFACE_ADDR}" dev "${INTERFACE}"
 
 # try to connect to the server using the used defined configuration
 openvpn --config ${OPENVPN_CONFIG}

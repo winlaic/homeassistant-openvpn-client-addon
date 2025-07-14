@@ -11,7 +11,8 @@
   "init": false,
   "privileged": ["NET_ADMIN"],
   "options": {
-    "ovpnfile": "client.ovpn"
+    "ovpnfile": "client.ovpn",
+    "interface": "end0"
   },
   "schema": {
     "ovpnfile": "str"
